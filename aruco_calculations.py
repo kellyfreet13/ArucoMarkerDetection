@@ -115,7 +115,8 @@ def single_frame_continuous_capture(continual_capture_seconds):
         # grab an image from the camera and get numpy arr
         camera.capture(raw_capture, format="bgr")
         image = raw_capture.array
-        u_frame = cv2.UMat(image)
+        img_gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+        u_frame = cv2.UMat(img_gray)
 
         # detect the aruco marker
         corners, ids, rejectedImgPoints = aruco.detectMarkers(u_frame, marker_dict)
@@ -171,9 +172,10 @@ def single_frame_continuous_capture(continual_capture_seconds):
                     break
 
         # execute this every second
-        print(time.time())
+        sleep_start = time.time()
         time.sleep(continual_capture_seconds)
-        print(time.time())
+        sleep_end = time.time()
+        print('slept: {0} seconds'.format(sleep_end-sleep_start))
 
 
 def test_aruco_image_folder(dir, expression):
