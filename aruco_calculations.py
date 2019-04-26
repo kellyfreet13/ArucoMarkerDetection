@@ -127,10 +127,11 @@ class ArucoCalculator(threading.Thread):
             # check if we've been given a marker to find
             if marker_id_to_find is None:
                 # time.sleep(self.continual_capture_seconds)
-                # print('no marker set to find. sleeping')
+                print('no marker set to find. waiting')
                 c.wait()
 
             else:
+                print('finding marker with id {0}'.format(marker_id_to_find))
                 camera.capture(raw_capture, format="bgr")
                 img = raw_capture.array
 
@@ -149,7 +150,7 @@ class ArucoCalculator(threading.Thread):
                     print('no aruco marker detected')
                     raw_capture.truncate(0)  # clean
                     time.sleep(self.continual_capture_seconds)
-                    continue
+                    break
 
                 # do conversion to UMat for opencv
                 u_camera_mtx = cv2.UMat(np.array(camera_mtx))
@@ -164,9 +165,6 @@ class ArucoCalculator(threading.Thread):
                         # reshape t and r vectors for matrix multiplication
                         rvec = rvecs.get()[i][0].reshape((3,1))
                         tvec = tvecs.get()[i][0].reshape((3,1))
-
-                        # BEGIN critical section (not really though at the moment)
-                        c.acquire()
 
                         # Rodrigues baby, look it up, and convert to matrix
                         R, _ = cv2.Rodrigues(rvec)
@@ -191,9 +189,6 @@ class ArucoCalculator(threading.Thread):
                         # set to global
                         offset = x
                         distance = z
-
-                        # END critical section (not really though, currently only one process writes to shared)
-                        c.release()
 
                         # draw detected markers on frame
                         aruco.drawDetectedMarkers(u_frame, corners, ids)
@@ -250,6 +245,7 @@ class MiguelsThread(threading.Thread):
                 print('offset: {0}, distance {1}'.format(offset, distance))
             else:
                 marker_id_to_find = 1
+                print('setting marker to find as {0}'.format(marker_id_to_find))
                 c.wait()
             c.release()
 
