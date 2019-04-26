@@ -201,21 +201,22 @@ def test_aruco_image_folder(dir, expression):
             cam_pose = -R * np.mat(tvec)
             cam_pose = np.squeeze(np.asarray(cam_pose))
 
-            x = cam_pose[-3]
-            y = cam_pose[-2]
             z = cam_pose[-1]
+            x = tvec[0][0]
+            z = round(z, 3)
+            x = round(x, 3)
             z_str = 'z: {0} meters'.format(z)
+            x_str = 'x: {0} meters'.format(x)
 
             aruco.drawDetectedMarkers(u_frame, corners, ids)
             posed_img = aruco.drawAxis(u_frame, u_camera_mtx, u_dist_coeffs, rvec, tvec, 0.1)
 
             cv2.namedWindow('aruco', cv2.WINDOW_NORMAL)
             cv2.resizeWindow('aruco', 600,600)
-            cv2.putText(posed_img, z_str, (300,300), cv2.FONT_HERSHEY_DUPLEX, 5.0, (50,50,50))
+            cv2.putText(posed_img, z_str, (260,290), cv2.FONT_HERSHEY_DUPLEX, 5.0, (0,0,0))
+            cv2.putText(posed_img, x_str, (260,420), cv2.FONT_HERSHEY_DUPLEX, 5.0, (0,0,0))
 
             cv2.imshow('aruco', posed_img)
-            print('x distance:', x)
-            print('y distance:', y)
             print('z distance:', z)
             print('x offset: ', tvec[0][0])
             print('\n')
@@ -235,7 +236,11 @@ def load_camera_calibration(filename):
 
 
 if __name__ == "__main__":
-    test_aruco_image_folder('./aruco_imgs/', 'x_offset*.jpg')
+    x_offset_reg = 'x_offset*.jpg'
+    z_dist_reg = 'meter*.jpg'
+    xz_test_dir = './aruco_imgs/'
+
+    test_aruco_image_folder(xz_test_dir, z_dist_reg)
     #test_rotations()
     #init_camera()
     #camera_calibration()
