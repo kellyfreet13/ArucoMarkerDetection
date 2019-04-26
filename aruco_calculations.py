@@ -127,11 +127,11 @@ class ArucoCalculator(threading.Thread):
             # check if we've been given a marker to find
             if marker_id_to_find is None:
                 # time.sleep(self.continual_capture_seconds)
-                print('no marker set to find. waiting')
+                print('[AC, f] no marker set to find. waiting')
                 c.wait()
 
             else:
-                print('finding marker with id {0}'.format(marker_id_to_find))
+                print('[AC, t] finding marker with id {0}'.format(marker_id_to_find))
                 camera.capture(raw_capture, format="bgr")
                 img = raw_capture.array
 
@@ -147,11 +147,12 @@ class ArucoCalculator(threading.Thread):
                 # detect the aruco marker
                 corners, ids, _ = aruco.detectMarkers(u_frame, marker_dict)
                 if ids.get() is None:
-                    print('no aruco marker detected')
+                    print('[AC, t] no aruco marker detected')
                     raw_capture.truncate(0)  # clean
                     time.sleep(self.continual_capture_seconds)
-                    
+
                     c.notify_all()
+                    c.release()
                     continue
 
                 # do conversion to UMat for opencv
@@ -221,7 +222,7 @@ class ArucoCalculator(threading.Thread):
                 # execute this every second
 
                 time.sleep(self.continual_capture_seconds)
-                print('[aruco_calc.py] global x: {0}, z: {1}'.format(offset, distance))
+                #print('[aruco_calc.py] global x: {0}, z: {1}'.format(offset, distance))
 
                 # let everyone know we're done
                 c.notify_all()
@@ -244,11 +245,11 @@ class MiguelsThread(threading.Thread):
             c.acquire()
 
             if marker_id_to_find is not None:
-                print('offset: {0}, distance {1}'.format(offset, distance))
+                print('[MT, t] offset: {0}, distance {1}'.format(offset, distance))
                 c.notify_all()
             else:
                 marker_id_to_find = 1
-                print('setting marker to find as {0}'.format(marker_id_to_find))
+                print('[MT, f] setting marker to find as {0}'.format(marker_id_to_find))
                 c.wait()
             c.release()
 
