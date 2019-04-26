@@ -24,6 +24,39 @@ def from_frame_capture():
     print('z: ', cam_pos[0][2])
     print('\n')
 
+# with a single marker for now
+# rvec = rvecs.get()[0][0]
+# tvec = tvecs.get()[0][0]
+
+# getting point coords in camera's world
+#rot_mat = cv2.Rodrigues(rvec)
+#print('rot_mat: ', rot_mat)
+
+# S.O. answer via alexk. no upvotes, this looks promising
+#R, _ = cv2.Rodrigues(rvecs.get())
+#camera_pose = -np.mat(R).T*np.mat(tvecs.get().reshape((3,1)))
+#x = camera_pose[0][0][0]
+#y = camera_pose[0][0][1]
+#z = camera_pose[0][0][2]
+#print('R:', R)
+#print('CP:', camera_pose)
+#print('z:', z)
+#print('tvecs.get() dtype:', type(tvecs.get()))
+
+# draw corner and id
+#aruco.drawDetectedMarkers(u_frame, corners, ids)
+
+# change in the future when multiple markers (0.1 is length of vevs drawn)
+#num_ids = ids.get().shape[0]
+#for i in range(num_ids):
+    #posed_img = aruco.drawAxis(u_frame, u_camera_mtx, u_dist_coeffs, rvecs, tvecs, 0.1)
+
+# via hungarian guy hoverno. TODO: check units
+#cv2.putText(posed_img, "z: %.1f units" % z, (0, 230), cv2.FONT_HERSHEY_SIMPLEX, 1.0, (50,120,244))
+#cv2.putText(posed_img, "y: %.1f units" % y, (0, 180), cv2.FONT_HERSHEY_SIMPLEX, 1.0, (80,244,70))
+#cv2.putText(posed_img, "x: %.1f units" % x, (0, 120), cv2.FONT_HERSHEY_SIMPLEX, 1.0, (244,60,140))
+
+
 # rvecs_corrected = rvecs.get()[0][0]
 # if rvecs_corrected[0] < 0:
 #   rvecs_cor = -(math.pi_rvecs_cor[0])
