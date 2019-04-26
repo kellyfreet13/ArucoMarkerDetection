@@ -150,7 +150,9 @@ class ArucoCalculator(threading.Thread):
                     print('no aruco marker detected')
                     raw_capture.truncate(0)  # clean
                     time.sleep(self.continual_capture_seconds)
-                    break
+                    
+                    c.notify_all()
+                    continue
 
                 # do conversion to UMat for opencv
                 u_camera_mtx = cv2.UMat(np.array(camera_mtx))
