@@ -6,6 +6,7 @@ import time
 import json
 import io
 import subprocess
+import threading
 
 from picamera.array import PiRGBArray
 from picamera import PiCamera
@@ -14,12 +15,11 @@ from picamera import PiCamera
 ARUCO_SQUARE_WIDTH = 0.141  # formerly 0.152
 CALIB_FILENAME = 'camera_calib.json'
 
-# shared global variables accessed from outside
-#global X
-#global Z
-#X = 0
-#Z = 0
-marker_id_to_find = 1
+# share between my and miguel's thread
+offset = 0
+distance = 0
+marker_id_to_find = None
+c = threading.Condition()
 
 
 def video_debugging():
@@ -95,138 +95,163 @@ def video_debugging():
         raw_capture.truncate(0)
 
 
-def single_frame_continuous_capture(continual_capture_seconds=2):
-    print('using pi camera single frame capture')
+class ArucoCalculator(threading.Thread):
+    def __init__(self, secs):
+        threading.Thread.__init__(self)
+        self.continual_capture_seconds = secs
 
-    # test globals
-    global X
-    global Z
+    def run(self):
+        print('using pi camera single frame capture')
 
-    # init the camera and grab a reference to the raw camera capture
-    camera = PiCamera()
-    camera.resolution = (2592, 1952)
-    #camera.framerate = 32
-    raw_capture = PiRGBArray(camera, size=(2592, 1952))
+        # declare as global to share between my and miguel's thread
+        global offset
+        global distance
+        global marker_id_to_find
 
-    # allow camera to warm up -> tested safe value
-    time.sleep(0.3)
+        # init the camera and grab a reference to the raw camera capture
+        camera = PiCamera()
+        camera.resolution = (2592, 1952)
+        #camera.framerate = 32
+        raw_capture = PiRGBArray(camera, size=(2592, 1952))
 
-    # create aruco marker dictionary and get camera calibration
-    marker_dict = aruco.getPredefinedDictionary(aruco.DICT_4X4_50)
-    camera_mtx, dist_coeffs = load_camera_calibration(CALIB_FILENAME)
+        # allow camera to warm up -> tested safe value
+        time.sleep(0.3)
 
-    while True:
+        # create aruco marker dictionary and get camera calibration
+        marker_dict = aruco.getPredefinedDictionary(aruco.DICT_4X4_50)
+        camera_mtx, dist_coeffs = load_camera_calibration(CALIB_FILENAME)
 
-        # check if we've been given a marker to find
-        if marker_id_to_find is None:
-            time.sleep(continual_capture_seconds)
-            print('no marker set to find. sleeping')
-            continue
+        while True:
+            c.acquire()
 
-        # setup byte stream
-        stream = io.BytesIO()
+            # check if we've been given a marker to find
+            if marker_id_to_find is None:
+                # time.sleep(self.continual_capture_seconds)
+                # print('no marker set to find. sleeping')
+                c.wait()
 
-        # grab an image from the camera and get numpy arr
-        #camera.capture(stream, format='bgr')
+            else:
+                camera.capture(raw_capture, format="bgr")
+                img = raw_capture.array
 
-        #img_arr = np.fromstring(stream.getvalue(), dtype=np.uint8)
-        #img = cv2.imdecode(img_arr, 1)
-        camera.capture(raw_capture, format="bgr")
-        img = raw_capture.array
+                fname = 'cv2image.jpg'
+                cv2.imwrite(fname, img)
 
-        fname = 'cv2image.jpg'
-        cv2.imwrite(fname, img)
-        #image = cv2.imread(fname, 0)
+                # some sketch shit
+                subprocess.run(['convert', fname, '-resize', '3280x2464', fname])
+                image = cv2.imread(fname, 0)
 
-        # some sketch shit
-        subprocess.run(['convert', fname, '-resize', '3280x2464', fname])
-        image = cv2.imread(fname, 0)
+                u_frame = cv2.UMat(image)
 
-        #cv2.imshow('image', image)
-        #cv2.waitKey(0)
-        u_frame = cv2.UMat(image)
+                # detect the aruco marker
+                corners, ids, _ = aruco.detectMarkers(u_frame, marker_dict)
+                if ids.get() is None:
+                    print('no aruco marker detected')
+                    raw_capture.truncate(0)  # clean
+                    time.sleep(self.continual_capture_seconds)
+                    continue
 
-        # clean up
-        stream.seek(0)
-        stream.truncate()
+                # do conversion to UMat for opencv
+                u_camera_mtx = cv2.UMat(np.array(camera_mtx))
+                u_dist_coeffs = cv2.UMat(np.array(dist_coeffs))
 
-        # detect the aruco marker
-        corners, ids, rejectedImgPoints = aruco.detectMarkers(u_frame, marker_dict)
-        if ids.get() is None:
-            print('no aruco marker detected')
-            raw_capture.truncate(0)  # clean
-            time.sleep(continual_capture_seconds)
-            continue
+                # get rotation, translation for each single aruco marker
+                rvecs, tvecs, obj_pts = \
+                     aruco.estimatePoseSingleMarkers(corners, ARUCO_SQUARE_WIDTH, u_camera_mtx, u_dist_coeffs)
 
-        # do conversion to UMat for opencv
-        u_camera_mtx = cv2.UMat(np.array(camera_mtx))
-        u_dist_coeffs = cv2.UMat(np.array(dist_coeffs))
+                if ids is not None:
+                    for i in range(ids.get().shape[0]):
+                        # reshape t and r vectors for matrix multiplication
+                        rvec = rvecs.get()[i][0].reshape((3,1))
+                        tvec = tvecs.get()[i][0].reshape((3,1))
 
-        # get rotation, translation for each single aruco marker
-        rvecs, tvecs, obj_pts = \
-             aruco.estimatePoseSingleMarkers(corners, ARUCO_SQUARE_WIDTH, u_camera_mtx, u_dist_coeffs)
+                        # BEGIN critical section (not really though at the moment)
+                        c.acquire()
 
-        if ids is not None:
-            for i in range(ids.get().shape[0]):
-                # reshape t and r vectors for matrix multiplication
-                rvec = rvecs.get()[i][0].reshape((3,1))
-                tvec = tvecs.get()[i][0].reshape((3,1))
+                        # Rodrigues baby, look it up, and convert to matrix
+                        R, _ = cv2.Rodrigues(rvec)
+                        R = np.mat(R).T
 
-                # Rodrigues baby, look it up, and convert to matrix
-                R, _ = cv2.Rodrigues(rvec)
-                R = np.mat(R).T
+                        # get the camera pose
+                        cam_pose = -R * np.mat(tvec)
+                        cam_pose = np.squeeze(np.asarray(cam_pose))
 
-                # get the camera pose
-                cam_pose = -R * np.mat(tvec)
-                cam_pose = np.squeeze(np.asarray(cam_pose))
+                        # extract x offset and z camera to marker distance
+                        z = cam_pose[-1]
+                        x = tvec[0][0]
 
-                # extract x offset and z camera to marker distance
-                z = cam_pose[-1]
-                x = tvec[0][0]
+                        # testing an idea here
+                        z *= .79024
+                        x *= .78896
+                        z = round(z, 3)
+                        x = round(x, 3)
+                        z_fmt = 'z: {0} meters'.format(z)
+                        x_fmt = 'x: {0} meters'.format(x)
 
-                # testing an idea here
-                z *= .79024
-                x *= .78896
-                z = round(z, 3)
-                x = round(x, 3)
-                z_fmt = 'z: {0} meters'.format(z)
-                x_fmt = 'x: {0} meters'.format(x)
+                        # set to global
+                        offset = x
+                        distance = z
 
-                # set to global
-                X = x
-                Z = z
+                        # END critical section (not really though, currently only one process writes to shared)
+                        c.release()
 
-                # draw detected markers on frame
-                aruco.drawDetectedMarkers(u_frame, corners, ids)
-                posed_img = aruco.drawAxis(u_frame, u_camera_mtx, u_dist_coeffs, rvec, tvec, 0.1)
+                        # draw detected markers on frame
+                        aruco.drawDetectedMarkers(u_frame, corners, ids)
+                        posed_img = aruco.drawAxis(u_frame, u_camera_mtx, u_dist_coeffs, rvec, tvec, 0.1)
 
-                # draw x and z distance calculation on frame
-                cv2.namedWindow('aruco', cv2.WINDOW_NORMAL)
-                cv2.resizeWindow('aruco', 600, 600)
-                cv2.putText(posed_img, z_fmt, (260, 290), cv2.FONT_HERSHEY_SIMPLEX, 5.0, (10,10,10))
-                cv2.putText(posed_img, x_fmt, (260, 450), cv2.FONT_HERSHEY_SIMPLEX, 5.0, (10,10,10))
+                        # draw x and z distance calculation on frame
+                        cv2.namedWindow('aruco', cv2.WINDOW_NORMAL)
+                        cv2.resizeWindow('aruco', 600, 600)
+                        cv2.putText(posed_img, z_fmt, (260, 290), cv2.FONT_HERSHEY_SIMPLEX, 5.0, (10,10,10))
+                        cv2.putText(posed_img, x_fmt, (260, 450), cv2.FONT_HERSHEY_SIMPLEX, 5.0, (10,10,10))
 
-                save_fname = './live_images/'+str(X)+str(Z)+'.jpg'
-                cv2.imwrite(save_fname, posed_img)
-                #cv2.resizeWindow('aruco', 600, 600)
-                #cv2.waitKey(0)
+                        save_fname = './live_images/' + str(offset) + str(distance) + '.jpg'
+                        cv2.imwrite(save_fname, posed_img)
+                        #cv2.resizeWindow('aruco', 600, 600)
+                        #cv2.waitKey(0)
 
-                # confirm with console
-                #print(z_fmt)
-                #print(x_fmt)
+                        # confirm with console
+                        #print(z_fmt)
+                        #print(x_fmt)
 
-                # clean up and exit condition
-                key = cv2.waitKey(1) & 0XFF
-                raw_capture.truncate(0)
-                if key == ord("q"):
-                    break
+                        # clean up and exit condition
+                        key = cv2.waitKey(1) & 0XFF
+                        raw_capture.truncate(0)
+                        if key == ord("q"):
+                            break
 
-        cv2.destroyAllWindows()
-        # execute this every second
-        sleep_start = time.time()
-        time.sleep(continual_capture_seconds)
-        sleep_end = time.time()
-        print('[aruco_calc.py] global x: {0}, z: {1}'.format(X, Z))
+                cv2.destroyAllWindows()
+                # execute this every second
+
+                time.sleep(self.continual_capture_seconds)
+                print('[aruco_calc.py] global x: {0}, z: {1}'.format(offset, distance))
+
+                # let everyone know we're done
+                c.notify_all()
+
+            # free the lock
+            c.release()
+
+
+class MiguelsThread(threading.Thread):
+    def __init__(self):
+        threading.Thread.__init__(self)
+
+    def run(self):
+        # declare as global to share between my and miguel's thread
+        global offset
+        global distance
+        global marker_id_to_find
+
+        while True:
+            c.acquire()
+
+            if marker_id_to_find is not None:
+                print('offset: {0}, distance {1}'.format(offset, distance))
+            else:
+                marker_id_to_find = 1
+                c.wait()
+            c.release()
 
 
 def test_aruco_image_folder(dir, expression):
@@ -313,8 +338,10 @@ if __name__ == "__main__":
     all_reg = '*.jpg'
     #test_aruco_image_folder(test_dir_apr, all_reg)
 
-    # continual single frame capture
-    capture_every_n_seconds = 2
-    single_frame_continuous_capture(capture_every_n_seconds)
+    ac = ArucoCalculator(2)
+    mt = MiguelsThread()
+
+    mt.start()
+    ac.start()
 
     #video_debugging()
