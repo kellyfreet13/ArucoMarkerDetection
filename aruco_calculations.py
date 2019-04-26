@@ -55,13 +55,24 @@ def video_debugging():
 
         if ids is not None:
             for i in range(ids.get().shape[0]):
+                # reshape r and t vectors for matrix multiplication
                 rvec = rvecs.get()[i][0].reshape((3,1))
                 tvec = tvecs.get()[i][0].reshape((3,1))
+
+                # get camera pose
                 R, _ = cv2.Rodrigues(rvec)
                 R = np.mat(R).T
                 cam_pose = -R * np.mat(tvec)
-                z = cam_pose[2][0]
-                z = np.squeeze(np.asarray(z))
+                cam_pose = np.squeeze(np.asarray(cam_pose))
+
+                # extract z value from pose and get x offset
+                z = cam_pose[-1]
+                x = tvec[0][0]
+                z = round(z, 3)
+                x = round(x, 3)
+                z_str = 'z: {0} meters'.format(z)
+                x_str = 'x: {0} meters'.format(x)
+
                 print('x offset', tvec)
                 print('R.type', type(R))
                 print('tvecs.get()', tvecs.get())
@@ -70,10 +81,13 @@ def video_debugging():
                 print('CP.shape', cam_pose.shape)
                 print('z:', z)
 
+                # draw detected markers on frame
                 aruco.drawDetectedMarkers(u_frame, corners, ids)
                 posed_img = aruco.drawAxis(u_frame, u_camera_mtx, u_dist_coeffs, rvec, tvec, 0.1)
-                cv2.putText(posed_img, "z: %.1f meters" % z, (0, 230), cv2.FONT_HERSHEY_SIMPLEX, 1.0, (10,10,10))
 
+                # write x and z values to frame and who
+                cv2.putText(posed_img, z_str, (0, 230), cv2.FONT_HERSHEY_SIMPLEX, 1.0, (10,10,10))
+                cv2.putText(posed_img, x_str, (0, 300), cv2.FONT_HERSHEY_DUPLEX, 1.0, (0, 0, 0))
                 cv2.imshow("aruco detection", posed_img)
 
                 # clean up and exit condition
@@ -83,8 +97,7 @@ def video_debugging():
                     break
 
 
-# TODO: Pass in frames per second to capture?
-def single_frame_continuous_capture():
+def single_frame_continuous_capture(continual_capture_seconds):
     print('using pi camera single frame capture')
 
     # init the camera and grab a reference to the raw camera capture
@@ -162,7 +175,7 @@ def single_frame_continuous_capture():
 
         # execute this every second
         print(time.time())
-        time.sleep(2)
+        time.sleep(continual_capture_seconds)
         print(time.time())
 
 
@@ -180,7 +193,7 @@ def test_aruco_image_folder(dir, expression):
         u_frame = cv2.UMat(image)
 
         # detectMarkers with frame, marker dict, marker corners, and marker ids
-        corners, ids, rejectedImgPoints = aruco.detectMarkers(u_frame, marker_dict)
+        corners, ids, _ = aruco.detectMarkers(u_frame, marker_dict)
 
         if ids.get() is None:
             print('no aruco marker detected')
@@ -193,14 +206,17 @@ def test_aruco_image_folder(dir, expression):
             aruco.estimatePoseSingleMarkers(corners, ARUCO_SQUARE_WIDTH, u_camera_mtx, u_dist_coeffs)
 
         for i in range(ids.get().shape[0]):
+            # reshape r and t vectors for matrix multiplication
             rvec = rvecs.get()[i][0].reshape((3,1))
             tvec = tvecs.get()[i][0].reshape((3,1))
 
+            # get camera pose
             R, _ = cv2.Rodrigues(rvec)
             R = np.mat(R).T
             cam_pose = -R * np.mat(tvec)
             cam_pose = np.squeeze(np.asarray(cam_pose))
 
+            # extract z value from pose and get x offset
             z = cam_pose[-1]
             x = tvec[0][0]
             z = round(z, 3)
@@ -208,17 +224,20 @@ def test_aruco_image_folder(dir, expression):
             z_str = 'z: {0} meters'.format(z)
             x_str = 'x: {0} meters'.format(x)
 
+            # draw detected markers on frame
             aruco.drawDetectedMarkers(u_frame, corners, ids)
             posed_img = aruco.drawAxis(u_frame, u_camera_mtx, u_dist_coeffs, rvec, tvec, 0.1)
 
+            # show to the user (remove once on teensy car)
             cv2.namedWindow('aruco', cv2.WINDOW_NORMAL)
             cv2.resizeWindow('aruco', 600,600)
             cv2.putText(posed_img, z_str, (260,290), cv2.FONT_HERSHEY_DUPLEX, 5.0, (0,0,0))
             cv2.putText(posed_img, x_str, (260,420), cv2.FONT_HERSHEY_DUPLEX, 5.0, (0,0,0))
 
+            # to confirm, console output
             cv2.imshow('aruco', posed_img)
             print('z distance:', z)
-            print('x offset: ', tvec[0][0])
+            print('x offset: ', x)
             print('\n')
 
             key = cv2.waitKey(10000) & 0XFF
@@ -236,11 +255,13 @@ def load_camera_calibration(filename):
 
 
 if __name__ == "__main__":
+    # testing pre-captured images -> not live
     x_offset_reg = 'x_offset*.jpg'
     z_dist_reg = 'meter*.jpg'
     xz_test_dir = './aruco_imgs/'
-
     test_aruco_image_folder(xz_test_dir, z_dist_reg)
-    #test_rotations()
-    #init_camera()
-    #camera_calibration()
+
+    # continual single frame capture
+    capture_every_n_seconds = 1
+    single_frame_continuous_capture()
+
