@@ -243,6 +243,7 @@ class MiguelsThread(threading.Thread):
 
             if marker_id_to_find is not None:
                 print('offset: {0}, distance {1}'.format(offset, distance))
+                c.notify_all()
             else:
                 marker_id_to_find = 1
                 print('setting marker to find as {0}'.format(marker_id_to_find))
