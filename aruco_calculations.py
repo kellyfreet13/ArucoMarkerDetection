@@ -33,7 +33,6 @@ def video_debugging():
     print('using pi camera video')
 
     raw_capture.truncate(0)  # clean
-
     # test continuous video first, easier debugging
     for frame in camera.capture_continuous(raw_capture, format="bgr", use_video_port=True):
 
@@ -73,28 +72,14 @@ def video_debugging():
                 z_str = 'z: {0} meters'.format(z)
                 x_str = 'x: {0} meters'.format(x)
 
-                print('x offset', tvec)
-                print('R.type', type(R))
-                print('tvecs.get()', tvecs.get())
-                print('tvecs.get()[i].type)', type(tvecs.get()[i]))
-                print('CP:', cam_pose)
-                print('CP.shape', cam_pose.shape)
-                print('z:', z)
-
-                # draw detected markers on frame
+                # draw detected marker borders and x, y, and z axes
                 aruco.drawDetectedMarkers(u_frame, corners, ids)
                 posed_img = aruco.drawAxis(u_frame, u_camera_mtx, u_dist_coeffs, rvec, tvec, 0.1)
 
                 # write x and z values to frame and who
-                cv2.putText(posed_img, z_str, (0, 230), cv2.FONT_HERSHEY_SIMPLEX, 1.0, (10,10,10))
-                cv2.putText(posed_img, x_str, (0, 300), cv2.FONT_HERSHEY_DUPLEX, 1.0, (0, 0, 0))
+                cv2.putText(posed_img, z_str, (0, 20), cv2.FONT_HERSHEY_SIMPLEX, 1.0, (10,10,10))
+                cv2.putText(posed_img, x_str, (0, 50), cv2.FONT_HERSHEY_DUPLEX, 1.0, (0, 0, 0))
                 cv2.imshow("aruco detection", posed_img)
-
-                # clean up and exit condition
-                key = cv2.waitKey(0) & 0XFF
-                raw_capture.truncate(0)
-                if key == ord("q"):
-                    break
 
 
 def single_frame_continuous_capture(continual_capture_seconds):
