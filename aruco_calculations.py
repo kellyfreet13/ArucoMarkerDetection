@@ -151,72 +151,69 @@ class ArucoCalculator(threading.Thread):
                     raw_capture.truncate(0)  # clean
                     time.sleep(self.continual_capture_seconds)
 
-                    c.notify_all()
-                    c.release()
-                    continue
+                else:
+                    # do conversion to UMat for opencv
+                    u_camera_mtx = cv2.UMat(np.array(camera_mtx))
+                    u_dist_coeffs = cv2.UMat(np.array(dist_coeffs))
 
-                # do conversion to UMat for opencv
-                u_camera_mtx = cv2.UMat(np.array(camera_mtx))
-                u_dist_coeffs = cv2.UMat(np.array(dist_coeffs))
+                    # get rotation, translation for each single aruco marker
+                    rvecs, tvecs, obj_pts = \
+                         aruco.estimatePoseSingleMarkers(corners, ARUCO_SQUARE_WIDTH, u_camera_mtx, u_dist_coeffs)
 
-                # get rotation, translation for each single aruco marker
-                rvecs, tvecs, obj_pts = \
-                     aruco.estimatePoseSingleMarkers(corners, ARUCO_SQUARE_WIDTH, u_camera_mtx, u_dist_coeffs)
+                    if ids is not None:
+                        for i in range(ids.get().shape[0]):
+                            # reshape t and r vectors for matrix multiplication
+                            rvec = rvecs.get()[i][0].reshape((3,1))
+                            tvec = tvecs.get()[i][0].reshape((3,1))
 
-                if ids is not None:
-                    for i in range(ids.get().shape[0]):
-                        # reshape t and r vectors for matrix multiplication
-                        rvec = rvecs.get()[i][0].reshape((3,1))
-                        tvec = tvecs.get()[i][0].reshape((3,1))
+                            # Rodrigues baby, look it up, and convert to matrix
+                            R, _ = cv2.Rodrigues(rvec)
+                            R = np.mat(R).T
 
-                        # Rodrigues baby, look it up, and convert to matrix
-                        R, _ = cv2.Rodrigues(rvec)
-                        R = np.mat(R).T
+                            # get the camera pose
+                            cam_pose = -R * np.mat(tvec)
+                            cam_pose = np.squeeze(np.asarray(cam_pose))
 
-                        # get the camera pose
-                        cam_pose = -R * np.mat(tvec)
-                        cam_pose = np.squeeze(np.asarray(cam_pose))
+                            # extract x offset and z camera to marker distance
+                            z = cam_pose[-1]
+                            x = tvec[0][0]
 
-                        # extract x offset and z camera to marker distance
-                        z = cam_pose[-1]
-                        x = tvec[0][0]
+                            # testing an idea here
+                            z *= .79024
+                            x *= .78896
+                            z = round(z, 3)
+                            x = round(x, 3)
+                            z_fmt = 'z: {0} meters'.format(z)
+                            x_fmt = 'x: {0} meters'.format(x)
 
-                        # testing an idea here
-                        z *= .79024
-                        x *= .78896
-                        z = round(z, 3)
-                        x = round(x, 3)
-                        z_fmt = 'z: {0} meters'.format(z)
-                        x_fmt = 'x: {0} meters'.format(x)
+                            # set to global
+                            offset = x
+                            distance = z
 
-                        # set to global
-                        offset = x
-                        distance = z
+                            # draw detected markers on frame
+                            aruco.drawDetectedMarkers(u_frame, corners, ids)
+                            posed_img = aruco.drawAxis(u_frame, u_camera_mtx, u_dist_coeffs, rvec, tvec, 0.1)
 
-                        # draw detected markers on frame
-                        aruco.drawDetectedMarkers(u_frame, corners, ids)
-                        posed_img = aruco.drawAxis(u_frame, u_camera_mtx, u_dist_coeffs, rvec, tvec, 0.1)
+                            # draw x and z distance calculation on frame
+                            cv2.namedWindow('aruco', cv2.WINDOW_NORMAL)
+                            cv2.resizeWindow('aruco', 600, 600)
+                            cv2.putText(posed_img, z_fmt, (260, 290), cv2.FONT_HERSHEY_SIMPLEX, 5.0, (10,10,10))
+                            cv2.putText(posed_img, x_fmt, (260, 450), cv2.FONT_HERSHEY_SIMPLEX, 5.0, (10,10,10))
 
-                        # draw x and z distance calculation on frame
-                        cv2.namedWindow('aruco', cv2.WINDOW_NORMAL)
-                        cv2.resizeWindow('aruco', 600, 600)
-                        cv2.putText(posed_img, z_fmt, (260, 290), cv2.FONT_HERSHEY_SIMPLEX, 5.0, (10,10,10))
-                        cv2.putText(posed_img, x_fmt, (260, 450), cv2.FONT_HERSHEY_SIMPLEX, 5.0, (10,10,10))
+                            save_fname = './live_images/' + str(offset) + str(distance) + '.jpg'
+                            cv2.imwrite(save_fname, posed_img)
+                            #cv2.resizeWindow('aruco', 600, 600)
+                            #cv2.waitKey(0)
 
-                        save_fname = './live_images/' + str(offset) + str(distance) + '.jpg'
-                        cv2.imwrite(save_fname, posed_img)
-                        #cv2.resizeWindow('aruco', 600, 600)
-                        #cv2.waitKey(0)
+                            # confirm with console
+                            #print(z_fmt)
+                            #print(x_fmt)
 
-                        # confirm with console
-                        #print(z_fmt)
-                        #print(x_fmt)
-
-                        # clean up and exit condition
-                        key = cv2.waitKey(1) & 0XFF
-                        raw_capture.truncate(0)
-                        if key == ord("q"):
-                            break
+                            # clean up and exit condition
+                            key = cv2.waitKey(1) & 0XFF
+                            raw_capture.truncate(0)
+                            if key == ord("q"):
+                                break
 
                 cv2.destroyAllWindows()
                 # execute this every second
@@ -250,7 +247,7 @@ class MiguelsThread(threading.Thread):
             else:
                 marker_id_to_find = 1
                 print('[MT, f] setting marker to find as {0}'.format(marker_id_to_find))
-                c.wait()
+                c.notify_all()
             c.release()
 
 
