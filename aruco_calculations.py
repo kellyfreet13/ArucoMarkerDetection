@@ -124,7 +124,7 @@ def single_frame_continuous_capture(continual_capture_seconds):
         if ids.get() is None:
             print('no aruco marker detected')
             raw_capture.truncate(0)  # clean
-            time.sleep(0.2)
+            time.sleep(continual_capture_seconds)
             continue
 
         # do conversion to UMat for opencv
@@ -137,9 +137,11 @@ def single_frame_continuous_capture(continual_capture_seconds):
 
         if ids is not None:
             for i in range(ids.get().shape[0]):
+                # reshape t and r vectors for matrix multiplication
                 rvec = rvecs.get()[i][0].reshape((3,1))
                 tvec = tvecs.get()[i][0].reshape((3,1))
 
+                # Rodrigues baby, look it up, and convert to matrix
                 R, _ = cv2.Rodrigues(rvec)
                 R = np.mat(R).T
 
@@ -149,22 +151,19 @@ def single_frame_continuous_capture(continual_capture_seconds):
 
                 # extract x offset and z camera to marker distance
                 z = cam_pose[-1]
-                x = cam_pose[-3]
+                x = tvec[0][0]
+                z = round(z, 3)
+                x = round(x, 3)
                 z_fmt = 'z: {0} meters'.format(z)
                 x_fmt = 'x: {0} meters'.format(x)
 
-                print('x offset', tvec)
-                print('R.type', type(R))
-                print('tvecs.get()', tvecs.get())
-                print('tvecs.get()[i].type)', type(tvecs.get()[i]))
-                print('CP:', cam_pose)
-                print('CP.shape', cam_pose.shape)
-                print('z:', z)
-
+                # draw detected markers on frame
                 aruco.drawDetectedMarkers(u_frame, corners, ids)
                 posed_img = aruco.drawAxis(u_frame, u_camera_mtx, u_dist_coeffs, rvec, tvec, 0.1)
-                cv2.putText(posed_img, z_fmt, (0, 230), cv2.FONT_HERSHEY_SIMPLEX, 1.0, (10,10,10))
-                cv2.putText(posed_img, x_fmt, (0, 270), cv2.FONT_HERSHEY_SIMPLEX, 1.0, (10,10,10))
+
+                # draw x and z distance calculation on frame
+                cv2.putText(posed_img, z_fmt, (0, 30), cv2.FONT_HERSHEY_SIMPLEX, 1.0, (10,10,10))
+                cv2.putText(posed_img, x_fmt, (0, 80), cv2.FONT_HERSHEY_SIMPLEX, 1.0, (10,10,10))
                 cv2.imshow("aruco detection", posed_img)
 
                 # clean up and exit condition
@@ -259,9 +258,10 @@ if __name__ == "__main__":
     x_offset_reg = 'x_offset*.jpg'
     z_dist_reg = 'meter*.jpg'
     xz_test_dir = './aruco_imgs/'
-    test_aruco_image_folder(xz_test_dir, z_dist_reg)
+    #test_aruco_image_folder(xz_test_dir, z_dist_reg)
 
     # continual single frame capture
-    capture_every_n_seconds = 1
-    single_frame_continuous_capture()
+    capture_every_n_seconds = 5
+    #single_frame_continuous_capture(capture_every_n_seconds)
 
+    video_debugging()
