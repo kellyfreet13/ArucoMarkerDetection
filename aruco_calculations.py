@@ -20,11 +20,11 @@ def video_debugging():
     # init the camera and grab a reference to the raw camera capture
     camera = PiCamera()
     camera.resolution = (640, 480)
-    camera.framerate = 32
+    camera.framerate = 16
     raw_capture = PiRGBArray(camera, size=(640, 480))
 
-    # allow camera to warmup
-    time.sleep(0.1)
+    # allow camera to warmup -> tested safe value
+    time.sleep(0.2)
 
     # create aruco marker dictionary and get camera calibration
     marker_dict = aruco.getPredefinedDictionary(aruco.DICT_4X4_50)
@@ -32,10 +32,10 @@ def video_debugging():
 
     print('using pi camera video')
 
-    raw_capture.truncate(0)  # clean
+    #raw_capture.truncate(0)  # clean
     # test continuous video first, easier debugging
     for frame in camera.capture_continuous(raw_capture, format="bgr", use_video_port=True):
-
+        # convert -> array -> umat
         image = frame.array
         u_frame = cv2.UMat(image)
 
@@ -77,13 +77,26 @@ def video_debugging():
                 posed_img = aruco.drawAxis(u_frame, u_camera_mtx, u_dist_coeffs, rvec, tvec, 0.1)
 
                 # write x and z values to frame and who
-                cv2.putText(posed_img, z_str, (0, 20), cv2.FONT_HERSHEY_SIMPLEX, 1.0, (10,10,10))
-                cv2.putText(posed_img, x_str, (0, 50), cv2.FONT_HERSHEY_DUPLEX, 1.0, (0, 0, 0))
+                cv2.putText(posed_img, z_str, (0, 40), cv2.FONT_HERSHEY_DUPLEX, 1.0, (0,0,0))
+                cv2.putText(posed_img, x_str, (0, 70), cv2.FONT_HERSHEY_DUPLEX, 1.0, (0,0,0))
                 cv2.imshow("aruco detection", posed_img)
+
+                key = cv2.waitKey(1) & 0xFF
+                if key == ord('q'):
+                    break
+
+        # clean for next frame
+        raw_capture.truncate(0)
 
 
 def single_frame_continuous_capture(continual_capture_seconds):
     print('using pi camera single frame capture')
+
+    # test camera init time
+    start = time.time()
+    with PiCamera() as camera:
+        pass
+    print('camera startup time', time.time()-start)
 
     # init the camera and grab a reference to the raw camera capture
     camera = PiCamera()
@@ -91,8 +104,8 @@ def single_frame_continuous_capture(continual_capture_seconds):
     camera.framerate = 32
     raw_capture = PiRGBArray(camera, size=(640, 480))
 
-    # allow camera to warm up
-    time.sleep(0.1)
+    # allow camera to warm up -> tested safe value
+    time.sleep(0.2)
 
     # create aruco marker dictionary and get camera calibration
     marker_dict = aruco.getPredefinedDictionary(aruco.DICT_4X4_50)
@@ -152,7 +165,7 @@ def single_frame_continuous_capture(continual_capture_seconds):
                 cv2.imshow("aruco detection", posed_img)
 
                 # clean up and exit condition
-                key = cv2.waitKey(0) & 0XFF
+                key = cv2.waitKey(1) & 0XFF
                 raw_capture.truncate(0)
                 if key == ord("q"):
                     break
@@ -243,10 +256,10 @@ if __name__ == "__main__":
     x_offset_reg = 'x_offset*.jpg'
     z_dist_reg = 'meter*.jpg'
     xz_test_dir = './aruco_imgs/'
-    #test_aruco_image_folder(xz_test_dir, z_dist_reg)
+    test_aruco_image_folder(xz_test_dir, z_dist_reg)
 
     # continual single frame capture
-    capture_every_n_seconds = 5
+    capture_every_n_seconds = 2
     #single_frame_continuous_capture(capture_every_n_seconds)
 
-    video_debugging()
+    #video_debugging()
