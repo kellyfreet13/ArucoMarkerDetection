@@ -169,15 +169,11 @@ def single_frame_continuous_capture():
 
                 # get the camera pose
                 cam_pose = -R * np.mat(tvec)
+                cam_pose = np.squeeze(np.asarray(cam_pose))
 
                 # extract x offset and z camera to marker distance
-                z = cam_pose[2][0]
-                x = cam_pose[0][0]
-                z = np.squeeze(np.asarray(z))
-                x = np.squeeze(np.asarray(x))
-
-                z = z[0]
-                x = x[0]
+                z = cam_pose[-1]
+                x = cam_pose[-3]
                 z_fmt = 'z: {0} meters'.format(z)
                 x_fmt = 'x: {0} meters'.format(x)
 
@@ -207,74 +203,6 @@ def single_frame_continuous_capture():
         print(time.time())
 
 
-def camera_calibration():
-    #criteria termination criteria
-    criteria = (cv2.TERM_CRITERIA_EPS + cv2.TERM_CRITERIA_MAX_ITER, 30, 0.001)
-
-    # prepare object points, like (0,0,0), (1,0,0), (2,0,0) ....,(6,5,0)
-    board_h = 9
-    board_w = 6
-
-    objp = np.zeros((board_w*board_h, 3), np.float32)
-    objp[:,:2] = np.mgrid[0:board_h,0:board_w].T.reshape(-1,2)
-
-    # Arrays to store object points and image points from all the images.
-    objpoints = [] # 3d point in real world space
-    imgpoints = [] # 2d points in image plane.
-
-    images = glob.glob('./calib_images/*.jpg')
-    images = sorted(images)
-
-    for fname in images:
-        print('reading img: ', fname)
-        img = cv2.imread(fname)
-        gray = cv2.cvtColor(img,cv2.COLOR_BGR2GRAY)
-
-        start = time.time()
-
-        # Find the chess board corners
-        ret, corners = cv2.findChessboardCorners(gray, (board_h, board_w), None)
-        end = time.time()
-
-        # If found, add object points, image points (after refining them)
-        if ret == True:
-            print('found corners!')
-            objpoints.append(objp)
-
-            corners2 = cv2.cornerSubPix(gray,corners,(11,11),(-1,-1),criteria)
-            imgpoints.append(corners2)
-
-            # Draw and display the corners
-            window_name = 'img'
-            img = cv2.drawChessboardCorners(img, (board_h, board_w), corners2,ret)
-            cv2.namedWindow(window_name, cv2.WINDOW_NORMAL)
-            cv2.resizeWindow(window_name, 1200, 1200)
-            cv2.imshow(window_name,img)
-            cv2.waitKey(0)
-
-    # see what the calibration comparision looks like
-    ret, mtx, dist, rvecs, tvecs = cv2.calibrateCamera(objpoints, imgpoints, gray.shape[::-1],None,None)
-    print('ret: ', ret)
-    print('mtx: ', mtx)
-    print('dist: ', dist)
-    print('rvecs: ', rvecs)
-    print('tvecs: ', tvecs)
-
-    img = cv2.imread(images[0])
-    h, w = img.shape[:2]
-    newcameramtx, roi = cv2.getOptimalNewCameraMatrix(mtx,dist,(w,h),1,(w,h))
-    print('new mtx: ', newcameramtx)
-
-    list_mtx = mtx.tolist()
-    list_dist = dist.tolist()
-    calib = {"camera_matrix": list_mtx, "dist_coeff": list_dist}
-    calib_fname = 'camera_calib.json'
-    with open(calib_fname, "w") as f:
-        json.dump(calib, f)
-
-    cv2.destroyAllWindows()
-
-
 def test_aruco_image_folder(dir, expression):
 
     # create an aruco marker dictionary load camera calibration
@@ -302,25 +230,17 @@ def test_aruco_image_folder(dir, expression):
             aruco.estimatePoseSingleMarkers(corners, ARUCO_SQUARE_WIDTH, u_camera_mtx, u_dist_coeffs)
 
         for i in range(ids.get().shape[0]):
-
-            rvec = rvecs.get()[0][0].reshape((3,1))
-            tvec = tvecs.get()[0][0].reshape((3,1))
+            rvec = rvecs.get()[i][0].reshape((3,1))
+            tvec = tvecs.get()[i][0].reshape((3,1))
 
             R, _ = cv2.Rodrigues(rvec)
             R = np.mat(R).T
             cam_pose = -R * np.mat(tvec)
+            cam_pose = np.squeeze(np.asarray(cam_pose))
 
-            x = cam_pose[0][0]
-            y = cam_pose[1][0]
-            z = cam_pose[2][0]
-
-            x = np.squeeze(np.asarray(x))
-            y = np.squeeze(np.asarray(y))
-            z = np.squeeze(np.asarray(z))
-
-            x = x[-3]
-            y = y[-2]
-            z = z[-1]
+            x = cam_pose[-3]
+            y = cam_pose[-2]
+            z = cam_pose[-1]
             z_str = 'z: {0} meters'.format(z)
 
             aruco.drawDetectedMarkers(u_frame, corners, ids)
