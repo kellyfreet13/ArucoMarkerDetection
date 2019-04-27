@@ -36,10 +36,11 @@ class ArucoCalculator(threading.Thread):
         global marker_id_to_find
 
         # init the camera and grab a reference to the raw camera capture
+        # (680, 480) is almost twice as fast for conversion, less accurate though?
+        # if low accuracy, change to (2592, 1952)
         camera = PiCamera()
-        camera.resolution = (2592, 1952)
-        #camera.framerate = 32
-        raw_capture = PiRGBArray(camera, size=(2592, 1952))
+        camera.resolution = (640, 480)
+        raw_capture = PiRGBArray(camera, size=(640, 480))
 
         # allow camera to warm up -> tested safe value
         time.sleep(0.3)
@@ -59,6 +60,7 @@ class ArucoCalculator(threading.Thread):
 
             else:
                 print('[AC, t] finding marker with id {0}'.format(marker_id_to_find))
+                start = time.time()
                 camera.capture(raw_capture, format="bgr")
                 img = raw_capture.array
 
@@ -70,6 +72,8 @@ class ArucoCalculator(threading.Thread):
                 image = cv2.imread(fname, 0)
 
                 u_frame = cv2.UMat(image)
+                end = time.time()
+                print('resize time 680->3280: {0}'.format(end-start))
 
                 # detect the aruco marker
                 corners, ids, _ = aruco.detectMarkers(u_frame, marker_dict)
