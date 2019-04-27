@@ -165,7 +165,8 @@ class ArucoCalculator(threading.Thread):
                              aruco.estimatePoseSingleMarkers(corners, ARUCO_SQUARE_WIDTH, u_camera_mtx, u_dist_coeffs)
 
                         # get the index of the marker id we want for the rest of the arrays
-                        id_index = ids.get().index(int(marker_id_to_find))
+                        flat = ids.get().flatten()
+                        id_index, = np.where(flat == int(marker_id_to_find))
 
                         # reshape t and r vectors for matrix multiplication
                         rvec = rvecs.get()[id_index][0].reshape((3,1))
