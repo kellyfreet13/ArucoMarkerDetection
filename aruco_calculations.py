@@ -124,9 +124,9 @@ class ArucoCalculator(threading.Thread):
         while True:
             c.acquire()
 
-            # check if we've been given a marker to find
+            # check if we've been given a marker to find.
+            # if not, wait until the other thread notifies us for an id
             if marker_id_to_find is None:
-                # time.sleep(self.continual_capture_seconds)
                 print('[AC, f] no marker set to find. waiting')
                 c.wait()
 
@@ -146,12 +146,18 @@ class ArucoCalculator(threading.Thread):
 
                 # detect the aruco marker
                 corners, ids, _ = aruco.detectMarkers(u_frame, marker_dict)
+
+                # no markers were found
                 if ids.get() is None:
                     print('[AC, t] no aruco marker detected')
                     raw_capture.truncate(0)  # clean
                     time.sleep(self.continual_capture_seconds)
-
+                # marker(s) were found
                 else:
+                    # before we do any work, check if marker with given id is present
+                    if int(marker_id_to_find) in ids.get():
+                        # do work
+
                     # do conversion to UMat for opencv
                     u_camera_mtx = cv2.UMat(np.array(camera_mtx))
                     u_dist_coeffs = cv2.UMat(np.array(dist_coeffs))
@@ -161,7 +167,10 @@ class ArucoCalculator(threading.Thread):
                          aruco.estimatePoseSingleMarkers(corners, ARUCO_SQUARE_WIDTH, u_camera_mtx, u_dist_coeffs)
 
                     # just for testing what the ids look like
-                    print('ids: ', ids.get())
+                    print('shape of ids: {0}'.format(ids.get().shape))
+                    print('type of ids: {0}'.format(type(ids.get())))
+                    for id in list(ids.get()):
+                        print('id: ', id)
 
                     for i in range(ids.get().shape[0]):
                         # reshape t and r vectors for matrix multiplication
