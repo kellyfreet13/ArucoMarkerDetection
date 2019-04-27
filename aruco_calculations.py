@@ -156,26 +156,20 @@ class ArucoCalculator(threading.Thread):
                 else:
                     # before we do any work, check if marker with given id is present
                     if int(marker_id_to_find) in ids.get():
-                        # do work
+                        # do conversion to UMat for opencv
+                        u_camera_mtx = cv2.UMat(np.array(camera_mtx))
+                        u_dist_coeffs = cv2.UMat(np.array(dist_coeffs))
 
-                    # do conversion to UMat for opencv
-                    u_camera_mtx = cv2.UMat(np.array(camera_mtx))
-                    u_dist_coeffs = cv2.UMat(np.array(dist_coeffs))
+                        # get rotation, translation for each single aruco marker
+                        rvecs, tvecs, obj_pts = \
+                             aruco.estimatePoseSingleMarkers(corners, ARUCO_SQUARE_WIDTH, u_camera_mtx, u_dist_coeffs)
 
-                    # get rotation, translation for each single aruco marker
-                    rvecs, tvecs, obj_pts = \
-                         aruco.estimatePoseSingleMarkers(corners, ARUCO_SQUARE_WIDTH, u_camera_mtx, u_dist_coeffs)
+                        # get the index of the marker id we want for the rest of the arrays
+                        id_index = ids.get().index(int(marker_id_to_find))
 
-                    # just for testing what the ids look like
-                    print('shape of ids: {0}'.format(ids.get().shape))
-                    print('type of ids: {0}'.format(type(ids.get())))
-                    for id in list(ids.get()):
-                        print('id: ', id)
-
-                    for i in range(ids.get().shape[0]):
                         # reshape t and r vectors for matrix multiplication
-                        rvec = rvecs.get()[i][0].reshape((3,1))
-                        tvec = tvecs.get()[i][0].reshape((3,1))
+                        rvec = rvecs.get()[id_index][0].reshape((3,1))
+                        tvec = tvecs.get()[id_index][0].reshape((3,1))
 
                         # Rodrigues baby, look it up, and convert to matrix
                         R, _ = cv2.Rodrigues(rvec)
@@ -189,9 +183,6 @@ class ArucoCalculator(threading.Thread):
                         z = cam_pose[-1]
                         x = tvec[0][0]
 
-                        # testing an idea here
-                        z *= .79024
-                        x *= .78896
                         z = round(z, 3)
                         x = round(x, 3)
                         z_fmt = 'z: {0} meters'.format(z)
