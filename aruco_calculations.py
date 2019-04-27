@@ -198,7 +198,6 @@ class MiguelsThread(threading.Thread):
             c.release()
 
 
-
 def load_camera_calibration(filename):
     with open(filename) as f:
         calib_json = json.load(f)
@@ -209,18 +208,10 @@ def load_camera_calibration(filename):
 
 
 if __name__ == "__main__":
-    # testing pre-captured images -> not live
-    x_offset_reg = 'x_offset*.jpg'
-    z_dist_reg = 'meter*.jpg'
-    xz_test_dir = './aruco_imgs/'
-    test_dir_apr = './test_images_Apr_25/'
-    all_reg = '*.jpg'
-    #test_aruco_image_folder(test_dir_apr, all_reg)
-
-    ac = ArucoCalculator(2)
+    seconds_per_capture = 2
+    ac = ArucoCalculator(seconds_per_capture)
     mt = MiguelsThread()
 
     mt.start()
     ac.start()
 
-    #video_debugging()
