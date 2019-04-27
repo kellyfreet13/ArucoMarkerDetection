@@ -32,7 +32,7 @@ class ArucoCalculator(threading.Thread):
 
         # determining whether to save to files and draw axis
         # anything besides distance and offset calculation
-        mode = 'debugging'
+        debugging = False
 
         # declare as global to share between my and miguel's thread
         global offset
@@ -63,34 +63,22 @@ class ArucoCalculator(threading.Thread):
                 c.wait()
 
             else:
-                print('[AC, t] finding marker with id {0}'.format(marker_id_to_find))
-                start = time.time()
-                camera.capture(raw_capture, format="bgr") #, resize=(3272, 2464)) # shape W x H x 3
+                print('[AC, t] trying to find marker with id {0}'.format(marker_id_to_find))
+                camera.capture(raw_capture, format="bgr") # shape W x H x 3
                 image = raw_capture.array  # shape H x W x 3
-
-                #fname = 'cv2image.jpg'
-                #cv2.imwrite(fname, img)
-
-                # some sketch shit
-                #subprocess.run(['convert', fname, '-resize', '3280x2464', fname])
-                #image = cv2.imread(fname, 0)
 
                 # input:  W x H (desired)
                 # output: H x W x 3
                 image = cv2.resize(image, dsize=(3280, 2464))
 
                 # output: H x W x 1
-                #image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+                image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
 
+                # typing for open cv
                 u_frame = cv2.UMat(image)
-                end = time.time()
-                print('resize time 640->3280: {0}'.format(end-start))
 
-                start = time.time()
                 # detect the aruco marker
                 corners, ids, _ = aruco.detectMarkers(u_frame, marker_dict)
-                end = time.time()
-                print('marker detection time: {0}'.format(end-start))
 
                 # no markers were found
                 if ids.get() is None:
@@ -99,7 +87,8 @@ class ArucoCalculator(threading.Thread):
                 # marker(s) were found
                 else:
                     # before we do any work, check if marker with given id is present
-                    if int(marker_id_to_find) in ids.get():
+                    if marker_id_to_find in ids.get().flatten():
+
                         # do conversion to UMat for opencv
                         u_camera_mtx = cv2.UMat(np.array(camera_mtx))
                         u_dist_coeffs = cv2.UMat(np.array(dist_coeffs))
@@ -137,7 +126,7 @@ class ArucoCalculator(threading.Thread):
                         offset = x
                         distance = z
 
-                        if mode == 'debugging':
+                        if debugging:
                             # draw detected markers on frame
                             aruco.drawDetectedMarkers(u_frame, corners, ids)
                             posed_img = aruco.drawAxis(u_frame, u_camera_mtx, u_dist_coeffs, rvec, tvec, 0.1)
@@ -158,24 +147,26 @@ class ArucoCalculator(threading.Thread):
                             #print(z_fmt)
                             #print(x_fmt)
 
-                        # clean up and exit condition
-                        key = cv2.waitKey(1) & 0XFF
-                        raw_capture.truncate(0)
-                        if key == ord("q"):
-                            break
+                            # clean up and exit condition
+                            key = cv2.waitKey(1) & 0XFF
+                            raw_capture.truncate(0)
+                            if key == ord("q"):
+                                break
 
                 # clean up
                 cv2.destroyAllWindows()
+                raw_capture.truncate(0)
 
                 # let everyone know we're done
                 c.notify_all()
 
-                # schleep, *sheets rustle*
-                time.sleep(self.continual_capture_seconds)
                 #print('[AC tf] global x: {0}, z: {1}'.format(offset, distance))
 
             # free the lock
             c.release()
+
+            # schleep, *sheets rustle*
+            time.sleep(self.continual_capture_seconds)
 
 
 class MiguelsThread(threading.Thread):
@@ -215,6 +206,6 @@ if __name__ == "__main__":
     ac = ArucoCalculator(seconds_per_capture)
     mt = MiguelsThread()
 
-    mt.start()
     ac.start()
+    mt.start()
 
