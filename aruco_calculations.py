@@ -28,7 +28,9 @@ class ArucoCalculator(threading.Thread):
         self.continual_capture_seconds = secs
 
     def run(self):
-        print('using pi camera single frame capture')
+        print('[AC] using pi camera single frame capture')
+
+        mode = debugging
 
         # declare as global to share between my and miguel's thread
         global offset
@@ -37,7 +39,7 @@ class ArucoCalculator(threading.Thread):
 
         # init the camera and grab a reference to the raw camera capture
         # (680, 480) is almost twice as fast for conversion, less accurate though?
-        # if low accuracy, change to (2592, 1952)
+        # if low accuracy, change to (2592, 1952) or (3296, 2464): was a bit overestimating
         camera = PiCamera()
         camera.resolution = (640, 480)
         raw_capture = PiRGBArray(camera, size=(640, 480))
@@ -61,28 +63,37 @@ class ArucoCalculator(threading.Thread):
             else:
                 print('[AC, t] finding marker with id {0}'.format(marker_id_to_find))
                 start = time.time()
-                camera.capture(raw_capture, format="bgr")
-                img = raw_capture.array
+                camera.capture(raw_capture, format="bgr") #, resize=(3272, 2464)) # shape W x H x 3
+                image = raw_capture.array  # shape H x W x 3
 
-                fname = 'cv2image.jpg'
-                cv2.imwrite(fname, img)
+                #fname = 'cv2image.jpg'
+                #cv2.imwrite(fname, img)
 
                 # some sketch shit
-                subprocess.run(['convert', fname, '-resize', '3280x2464', fname])
-                image = cv2.imread(fname, 0)
+                #subprocess.run(['convert', fname, '-resize', '3280x2464', fname])
+                #image = cv2.imread(fname, 0)
+
+                # input:  W x H (desired)
+                # output: H x W x 3
+                image = cv2.resize(image, dsize=(3280, 2464))
+
+                # output: H x W x 1
+                #image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
 
                 u_frame = cv2.UMat(image)
                 end = time.time()
-                print('resize time 680->3280: {0}'.format(end-start))
+                print('resize time 640->3280: {0}'.format(end-start))
 
+                start = time.time()
                 # detect the aruco marker
                 corners, ids, _ = aruco.detectMarkers(u_frame, marker_dict)
+                end = time.time()
+                print('marker detection time: {0}'.format(end-start))
 
                 # no markers were found
                 if ids.get() is None:
                     print('[AC, t] no aruco marker detected')
                     raw_capture.truncate(0)  # clean
-                    time.sleep(self.continual_capture_seconds)
                 # marker(s) were found
                 else:
                     # before we do any work, check if marker with given id is present
@@ -125,7 +136,7 @@ class ArucoCalculator(threading.Thread):
                         distance = z
 
                         # draw detected markers on frame
-                        aruco.drawDetectedMarkers(u_frame, corners, ids)
+                        aruco.drawDetectedMarkers(u_frame, corners, ids) # REMOVE in production
                         posed_img = aruco.drawAxis(u_frame, u_camera_mtx, u_dist_coeffs, rvec, tvec, 0.1)
 
                         # draw x and z distance calculation on frame
@@ -134,6 +145,7 @@ class ArucoCalculator(threading.Thread):
                         cv2.putText(posed_img, z_fmt, (260, 290), cv2.FONT_HERSHEY_SIMPLEX, 5.0, (10,10,10))
                         cv2.putText(posed_img, x_fmt, (260, 450), cv2.FONT_HERSHEY_SIMPLEX, 5.0, (10,10,10))
 
+                        # REMOVE IN PRODUCTION
                         save_fname = './live_images/' + str(offset) + str(distance) + '.jpg'
                         cv2.imwrite(save_fname, posed_img)
                         #cv2.resizeWindow('aruco', 600, 600)
@@ -149,14 +161,15 @@ class ArucoCalculator(threading.Thread):
                         if key == ord("q"):
                             break
 
+                # clean up
                 cv2.destroyAllWindows()
-                # execute this every second
-
-                time.sleep(self.continual_capture_seconds)
-                #print('[aruco_calc.py] global x: {0}, z: {1}'.format(offset, distance))
 
                 # let everyone know we're done
                 c.notify_all()
+
+                # schleep, *sheets rustle*
+                time.sleep(self.continual_capture_seconds)
+                #print('[AC tf] global x: {0}, z: {1}'.format(offset, distance))
 
             # free the lock
             c.release()
