@@ -30,7 +30,9 @@ class ArucoCalculator(threading.Thread):
     def run(self):
         print('[AC] using pi camera single frame capture')
 
-        mode = debugging
+        # determining whether to save to files and draw axis
+        # anything besides distance and offset calculation
+        mode = 'debugging'
 
         # declare as global to share between my and miguel's thread
         global offset
@@ -135,25 +137,26 @@ class ArucoCalculator(threading.Thread):
                         offset = x
                         distance = z
 
-                        # draw detected markers on frame
-                        aruco.drawDetectedMarkers(u_frame, corners, ids) # REMOVE in production
-                        posed_img = aruco.drawAxis(u_frame, u_camera_mtx, u_dist_coeffs, rvec, tvec, 0.1)
+                        if mode == 'debugging':
+                            # draw detected markers on frame
+                            aruco.drawDetectedMarkers(u_frame, corners, ids)
+                            posed_img = aruco.drawAxis(u_frame, u_camera_mtx, u_dist_coeffs, rvec, tvec, 0.1)
 
-                        # draw x and z distance calculation on frame
-                        cv2.namedWindow('aruco', cv2.WINDOW_NORMAL)
-                        cv2.resizeWindow('aruco', 600, 600)
-                        cv2.putText(posed_img, z_fmt, (260, 290), cv2.FONT_HERSHEY_SIMPLEX, 5.0, (10,10,10))
-                        cv2.putText(posed_img, x_fmt, (260, 450), cv2.FONT_HERSHEY_SIMPLEX, 5.0, (10,10,10))
+                            # draw x and z distance calculation on frame
+                            cv2.namedWindow('aruco', cv2.WINDOW_NORMAL)
+                            cv2.resizeWindow('aruco', 600, 600)
+                            cv2.putText(posed_img, z_fmt, (260, 290), cv2.FONT_HERSHEY_SIMPLEX, 5.0, (10,10,10))
+                            cv2.putText(posed_img, x_fmt, (260, 450), cv2.FONT_HERSHEY_SIMPLEX, 5.0, (10,10,10))
 
-                        # REMOVE IN PRODUCTION
-                        save_fname = './live_images/' + str(offset) + str(distance) + '.jpg'
-                        cv2.imwrite(save_fname, posed_img)
-                        #cv2.resizeWindow('aruco', 600, 600)
-                        #cv2.waitKey(0)
+                            # save image so we can see what it looks like
+                            save_fname = './live_images/' + str(offset) + 'x_' + str(distance) + 'z.jpg'
+                            cv2.imwrite(save_fname, posed_img)
+                            #cv2.resizeWindow('aruco', 600, 600)
+                            #cv2.waitKey(0)
 
-                        # confirm with console
-                        #print(z_fmt)
-                        #print(x_fmt)
+                            # confirm with console
+                            #print(z_fmt)
+                            #print(x_fmt)
 
                         # clean up and exit condition
                         key = cv2.waitKey(1) & 0XFF
