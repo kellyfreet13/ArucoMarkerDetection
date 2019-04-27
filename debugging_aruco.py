@@ -171,4 +171,3 @@ if __name__ == "__main__":
     test_dir_apr = './test_images_Apr_25/'
     all_reg = '*.jpg'
     #test_aruco_image_folder(test_dir_apr, all_reg)
-    
