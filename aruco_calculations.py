@@ -72,7 +72,7 @@ class ArucoCalculator(threading.Thread):
                 image = cv2.resize(image, dsize=(3280, 2464))
 
                 # output: H x W x 1
-                image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+                #image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
 
                 # typing for open cv
                 u_frame = cv2.UMat(image)
@@ -134,14 +134,16 @@ class ArucoCalculator(threading.Thread):
                             # draw x and z distance calculation on frame
                             cv2.namedWindow('aruco', cv2.WINDOW_NORMAL)
                             cv2.resizeWindow('aruco', 600, 600)
-                            cv2.putText(posed_img, z_fmt, (260, 290), cv2.FONT_HERSHEY_SIMPLEX, 5.0, (10,10,10))
-                            cv2.putText(posed_img, x_fmt, (260, 450), cv2.FONT_HERSHEY_SIMPLEX, 5.0, (10,10,10))
-
+                            cv2.putText(posed_img, z_fmt, (20, 2200), cv2.FONT_HERSHEY_SIMPLEX, 5.0, (0,0,0))
+                            cv2.putText(posed_img, x_fmt, (20, 2350), cv2.FONT_HERSHEY_SIMPLEX, 5.0, (0,0,0))
                             # save image so we can see what it looks like
                             save_fname = './live_images/' + str(offset) + 'x_' + str(distance) + 'z.jpg'
                             cv2.imwrite(save_fname, posed_img)
-                            #cv2.resizeWindow('aruco', 600, 600)
-                            #cv2.waitKey(0)
+
+                            # show the image
+                            cv2.imshow('aruco', posed_img)
+                            cv2.resizeWindow('aruco', 600, 600)
+                            cv2.waitKey(0)
 
                             # confirm with console
                             #print(z_fmt)
@@ -202,7 +204,7 @@ def load_camera_calibration(filename):
 
 
 if __name__ == "__main__":
-    seconds_per_capture = 2
+    seconds_per_capture = 0.5
     ac = ArucoCalculator(seconds_per_capture)
     mt = MiguelsThread()
 
