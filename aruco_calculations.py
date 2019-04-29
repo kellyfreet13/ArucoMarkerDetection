@@ -54,13 +54,13 @@ class ArucoCalculator(threading.Thread):
         camera_mtx, dist_coeffs = load_camera_calibration(CALIB_FILENAME)
 
         while True:
-            c.acquire()
-
             # check if we've been given a marker to find.
             # if not, wait until the other thread notifies us for an id
             if marker_id_to_find is None:
-                print('[AC, f] no marker set to find. waiting')
-                c.wait()
+                print('[AC, f] no marker set to find. sleeping')
+
+                # sleep instead using wait()
+                time.sleep(0.5)
 
             else:
                 print('[AC, t] trying to find marker with id {0}'.format(marker_id_to_find))
@@ -119,14 +119,21 @@ class ArucoCalculator(threading.Thread):
 
                         z = round(z, 3)
                         x = round(x, 3)
-                        z_fmt = 'z: {0} meters'.format(z)
-                        x_fmt = 'x: {0} meters'.format(x)
+
+                        # critical section begin
+                        c.acquire()
 
                         # set to global
                         offset = x
                         distance = z
 
+                        # critical section end
+                        c.release()
+
                         if debugging:
+                            z_fmt = 'z: {0} meters'.format(z)
+                            x_fmt = 'x: {0} meters'.format(x)
+
                             # draw detected markers on frame
                             aruco.drawDetectedMarkers(u_frame, corners, ids)
                             posed_img = aruco.drawAxis(u_frame, u_camera_mtx, u_dist_coeffs, rvec, tvec, 0.1)
@@ -155,20 +162,14 @@ class ArucoCalculator(threading.Thread):
                             if key == ord("q"):
                                 break
 
+                    # schleep, *sheets rustle*
+                    time.sleep(self.continual_capture_seconds)
+
                 # clean up
                 cv2.destroyAllWindows()
                 raw_capture.truncate(0)
 
-                # let everyone know we're done
-                c.notify_all()
-
                 #print('[AC tf] global x: {0}, z: {1}'.format(offset, distance))
-
-            # free the lock
-            c.release()
-
-            # schleep, *sheets rustle*
-            time.sleep(self.continual_capture_seconds)
 
 
 class MiguelsThread(threading.Thread):
@@ -182,16 +183,15 @@ class MiguelsThread(threading.Thread):
         global marker_id_to_find
 
         while True:
-            c.acquire()
-
             if marker_id_to_find is not None:
                 print('[MT, t] offset: {0}, distance {1}'.format(offset, distance))
-                c.wait()
+                # sleep instead of waiting
+                time.sleep(.5)
             else:
+                c.acquire()
                 marker_id_to_find = 1
                 print('[MT, f] setting marker to find as {0}'.format(marker_id_to_find))
-                c.notify_all()
-            c.release()
+                c.release()
 
 
 def load_camera_calibration(filename):
