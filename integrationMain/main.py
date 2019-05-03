@@ -5,14 +5,11 @@ import serial
 from aruco_calculations import ArucoCalculator
 from codeListener import codeListener
 
-global offset
-global distance
-global condition
+#global offset
+#global distance
+#global condition
 
 # Global variables
-offset = 0
-distance = 0
-QR_code = None
 condition = threading.Condition()
 printSem = threading.Semaphore()
 serialSem = threading.Semaphore()
@@ -26,7 +23,7 @@ def readSerial():
     while 1:
         sleep(1)
         serialSem.acquire()
-        pay = serial.read_all()
+        pay = serial.serial.read_all()
         serialSem.release()
         if(pay != b''):                                                 # If not empty print
             printSem.acquire()
@@ -43,4 +40,4 @@ if __name__ == "__main__":
     cameraThread.start()                                                # Start threads
     teensyInterface.start()
 
-    readThread = threading.Thread(target=readSerial())                  # Create thread to read serial
+#    readThread = threading.Thread(target=readSerial())                  # Create thread to read serial
