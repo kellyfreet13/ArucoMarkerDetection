@@ -8,6 +8,9 @@ import io
 import subprocess
 import threading
 
+# import shared variables
+import config
+
 from picamera.array import PiRGBArray
 from picamera import PiCamera
 
@@ -16,30 +19,27 @@ ARUCO_SQUARE_WIDTH = 0.141  # formerly 0.152
 CALIB_FILENAME = 'camera_calib.json'
 
 # share between my and miguel's thread
-offset = 0
-distance = 0
-QR_code = None
-condition = threading.Condition()
+#offset = 0
+#distance = 0
+#QR_code = None
+#condition = threading.Condition()
 
 
 class ArucoCalculator(threading.Thread):
     def __init__(self, secs, c):
         threading.Thread.__init__(self)
         self.continual_capture_seconds = secs
-        condition  = c
+
+        condition = c
+ 
 
     def run(self):
+
         print('[AC] using pi camera single frame capture')
 
         # determining whether to save to files and draw axis
         # anything besides distance and offset calculation
         debugging = False
-
-        # declare as global to share between my and miguel's thread
-        global offset
-        global distance
-        global QR_code
-        global condition
 
         # init the camera and grab a reference to the raw camera capture
         # (680, 480) is almost twice as fast for conversion, less accurate though?
@@ -58,14 +58,14 @@ class ArucoCalculator(threading.Thread):
         while True:
             # check if we've been given a marker to find.
             # if not, wait until the other thread notifies us for an id
-            if QR_code is None:
+            if config.QR_code is None:
                 print('[AC, f] no marker set to find. sleeping')
 
                 # sleep instead using wait()
                 time.sleep(0.5)
 
             else:
-                print('[AC, t] trying to find marker with id {0}'.format(QR_code))
+                print('[AC, t] trying to find marker with id {0}'.format(config.QR_code))
                 camera.capture(raw_capture, format="bgr") # shape W x H x 3
                 image = raw_capture.array  # shape H x W x 3
 
@@ -89,7 +89,7 @@ class ArucoCalculator(threading.Thread):
                 # marker(s) were found
                 else:
                     # before we do any work, check if marker with given id is present
-                    if QR_code in ids.get().flatten():
+                    if config.QR_code in ids.get().flatten():
 
                         # do conversion to UMat for opencv
                         u_camera_mtx = cv2.UMat(np.array(camera_mtx))
@@ -126,8 +126,8 @@ class ArucoCalculator(threading.Thread):
                         condition.acquire()
 
                         # set to global
-                        offset = x
-                        distance = z
+                        config.offset = x
+                        config.distance = z
 
                         # critical section end
                         condition.release()
