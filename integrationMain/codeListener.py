@@ -10,8 +10,6 @@ import config
 
 portLocation = '/dev/ttyACM0'
 
-#distance = 0
-#offset = 0
 sensor1 = 0
 sensor2 = 0
 sensor3 = 0
@@ -47,12 +45,6 @@ class codeListener(threading.Thread):
         return pay
 
     def run(self):
-        # shared between threads
-        #global offset
-        #global distance
-        #global QR_code
-        #global condition
-
         print("\nCode listener running\n")
         self.recvBroadcastCode()
         self.readSerial()
