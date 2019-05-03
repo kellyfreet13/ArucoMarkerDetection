@@ -18,12 +18,6 @@ from picamera import PiCamera
 ARUCO_SQUARE_WIDTH = 0.141  # formerly 0.152
 CALIB_FILENAME = 'camera_calib.json'
 
-# share between my and miguel's thread
-#offset = 0
-#distance = 0
-#QR_code = None
-#condition = threading.Condition()
-
 
 class ArucoCalculator(threading.Thread):
     def __init__(self, secs, c):
@@ -31,7 +25,7 @@ class ArucoCalculator(threading.Thread):
         self.continual_capture_seconds = secs
 
         condition = c
- 
+
 
     def run(self):
 
@@ -146,7 +140,7 @@ class ArucoCalculator(threading.Thread):
                             cv2.putText(posed_img, z_fmt, (20, 2200), cv2.FONT_HERSHEY_SIMPLEX, 5.0, (0,0,0))
                             cv2.putText(posed_img, x_fmt, (20, 2350), cv2.FONT_HERSHEY_SIMPLEX, 5.0, (0,0,0))
                             # save image so we can see what it looks like
-                            save_fname = './live_images/' + str(offset) + 'x_' + str(distance) + 'z.jpg'
+                            save_fname = './live_images/' + str(config.offset) + 'x_' + str(config.distance) + 'z.jpg'
                             cv2.imwrite(save_fname, posed_img)
 
                             # show the image
@@ -172,28 +166,6 @@ class ArucoCalculator(threading.Thread):
                 raw_capture.truncate(0)
 
                 #print('[AC tf] global x: {0}, z: {1}'.format(offset, distance))
-
-
-class MiguelsThread(threading.Thread):
-    def __init__(self):
-        threading.Thread.__init__(self)
-
-    def run(self):
-        # declare as global to share between my and miguel's thread
-        global offset
-        global distance
-        global QR_code
-
-        while True:
-            if marker_id_to_find is not None:
-                print('[MT, t] offset: {0}, distance {1}'.format(offset, distance))
-                # sleep instead of waiting
-                time.sleep(.5)
-            else:
-                condition.acquire()
-                marker_id_to_find = 1
-                print('[MT, f] setting marker to find as {0}'.format(marker_id_to_find))
-                condition.release()
 
 
 def load_camera_calibration(filename):
